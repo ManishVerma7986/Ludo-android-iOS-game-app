@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: ludo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ludo_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm test
+        env:
+          TEST_DATABASE_URL: postgres://postgres:ci_only_password@127.0.0.1:5432/ludo_test
+      - run: npm run build
+      - run: npm audit
+      - run: docker build -t ludo-server:ci .
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter analyze
+      - run: dart format --output=none --set-exit-if-changed lib test
+
+  android-release-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: flutter pub get
+        working-directory: mobile
+      - name: Create ephemeral CI signing key
+        run: keytool -genkeypair -noprompt -keystore "$RUNNER_TEMP/ludo-ci.jks" -storepass ci_only_password -keypass ci_only_password -alias ci -keyalg RSA -keysize 2048 -validity 1 -dname "CN=CI-only"
+      - run: flutter build apk --release --dart-define=LUDO_SERVER_URL=https://ci.example.invalid
+        working-directory: mobile
+        env:
+          LUDO_APPLICATION_ID: org.ci.ludo
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ludo-ci.jks
+          ANDROID_KEYSTORE_PASSWORD: ci_only_password
+          ANDROID_KEY_ALIAS: ci
+          ANDROID_KEY_PASSWORD: ci_only_password
+
+  ios-simulator-compile:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: mobile
+      - name: Set non-publishable CI bundle identifier
+        run: printf 'LUDO_BUNDLE_IDENTIFIER = org.ci.ludo\n' > mobile/ios/Flutter/Publisher.xcconfig
+      - run: flutter build ios --simulator --no-codesign --dart-define=LUDO_SERVER_URL=https://ci.example.invalid
+        working-directory: mobile

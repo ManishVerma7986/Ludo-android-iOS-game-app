@@ -1,0 +1,14 @@
+.env
+**/.env
+!**/.env.example
+**/node_modules/
+**/dist/
+**/.dart_tool/
+**/build/
+**/.gradle/
+**/local.properties
+**/Pods/
+reference_ludo_repo/
+*.jks
+*.keystore
+mobile/ios/Flutter/Publisher.xcconfig

@@ -1,0 +1,35 @@
+services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ludo_app
+      POSTGRES_USER: ludo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
+    volumes:
+      - ludo-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ludo -d ludo_app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  server:
+    build:
+      context: ./server
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgres://ludo:${POSTGRES_PASSWORD}@database:5432/ludo_app
+      DATABASE_SSL: "false"
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:?Set HTTPS CLIENT_ORIGIN}
+      CHAT_BLOCKED_TERMS: ${CHAT_BLOCKED_TERMS:-}
+    ports:
+      - "${LUDO_PORT:-4000}:4000"
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ludo-postgres-data:

@@ -40,8 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _nameController.text,
     );
     if (!joined) return;
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const GameScreen()));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GameScreen()));
   }
 
   void _joinRoom() {
@@ -56,8 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _nameController.text,
     );
     if (!joined) return;
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const GameScreen()));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GameScreen()));
   }
 
   @override
